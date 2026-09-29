@@ -47,6 +47,22 @@ run("Flasharo API with a test PostgreSQL database", () => {
     expect((await request("GET", "/v1/sets", "invalid")).statusCode).toBe(401);
   });
 
+  it("allows browser preflight for editing, publishing, ordering, and deletion", async () => {
+    for (const method of ["PATCH", "PUT", "DELETE"]) {
+      const response = await app.inject({
+        method: "OPTIONS",
+        url: "/v1/sets/00000000-0000-0000-0000-000000000000/visibility",
+        headers: {
+          origin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
+          "access-control-request-method": method,
+          "access-control-request-headers": "authorization,content-type",
+        },
+      });
+      expect(response.statusCode).toBe(204);
+      expect(response.headers["access-control-allow-methods"]).toContain(method);
+    }
+  });
+
   it("syncs a profile again after its row is removed", async () => {
     const first = await request("GET", "/v1/me", "alice");
     expect(first.statusCode).toBe(200);
@@ -94,6 +110,32 @@ run("Flasharo API with a test PostgreSQL database", () => {
     expect((await request("DELETE", `/v1/sets/${setId}`, "bob")).statusCode).toBe(404);
     expect((await request("PATCH", `/v1/sets/${setId}/cards/${cardId}`, "bob", { term: "X", definition: "Y" })).statusCode).toBe(404);
     expect((await request("GET", "/v1/sets", "bob")).json()).toEqual([]);
+  });
+
+  it("publishes only on owner request and removes a set from public search when made private", async () => {
+    const created = await request("POST", "/v1/sets", "alice", { title: "Ocean biology", description: "Sea life" });
+    const setId = created.json().id as string;
+    expect(created.json().visibility).toBe("private");
+    expect((await request("GET", `/v1/public/sets/${setId}`)).statusCode).toBe(404);
+    expect((await request("GET", "/v1/public/sets?q=ocean")).json().total).toBe(0);
+
+    expect((await request("PATCH", `/v1/sets/${setId}/visibility`, "bob", { visibility: "public" })).statusCode).toBe(404);
+    expect((await request("PATCH", `/v1/sets/${setId}/visibility`, "alice", { visibility: "unlisted" })).statusCode).toBe(400);
+    const published = await request("PATCH", `/v1/sets/${setId}/visibility`, "alice", { visibility: "public" });
+    expect(published.statusCode).toBe(200);
+    expect(published.json().visibility).toBe("public");
+
+    const publicSet = await request("GET", `/v1/public/sets/${setId}`);
+    expect(publicSet.statusCode).toBe(200);
+    expect(publicSet.json().title).toBe("Ocean biology");
+    const search = await request("GET", "/v1/public/sets?q=Sea%20life&page=1");
+    expect(search.statusCode).toBe(200);
+    expect(search.json().items.map((set: { id: string }) => set.id)).toContain(setId);
+    expect((await request("PATCH", `/v1/sets/${setId}`, "bob", { title: "Changed" })).statusCode).toBe(404);
+
+    expect((await request("PATCH", `/v1/sets/${setId}/visibility`, "alice", { visibility: "private" })).statusCode).toBe(200);
+    expect((await request("GET", `/v1/public/sets/${setId}`)).statusCode).toBe(404);
+    expect((await request("GET", "/v1/public/sets?q=ocean")).json().total).toBe(0);
   });
 
   it("rejects blank card content and incomplete reorder lists", async () => {

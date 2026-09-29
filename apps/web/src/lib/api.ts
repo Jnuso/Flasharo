@@ -1,5 +1,4 @@
 import type { User } from "firebase/auth";
-import type { ApiError } from "@flasharo/contracts";
 
 const baseUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3001/v1";
 
@@ -9,22 +8,27 @@ export class ApiRequestError extends Error {
   }
 }
 
-export async function apiFetch<T>(user: User, path: string, init: RequestInit = {}): Promise<T> {
-  const token = await user.getIdToken();
-  const response = await fetch(`${baseUrl}${path}`, {
-    ...init,
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-      ...init.headers,
-    },
-  });
-
+async function readResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) return undefined as T;
-  const data = await response.json() as T | ApiError;
+  const data = await response.json() as unknown;
   if (!response.ok) {
-    throw new ApiRequestError("error" in data ? data.error : "Request failed.", response.status);
+    const message = data && typeof data === "object" && "error" in data && typeof data.error === "string"
+      ? data.error
+      : "Request failed.";
+    throw new ApiRequestError(message, response.status);
   }
   return data as T;
+}
+
+export async function apiFetch<T>(user: User, path: string, init: RequestInit = {}): Promise<T> {
+  const token = await user.getIdToken();
+  const headers = new Headers(init.headers);
+  headers.set("Content-Type", "application/json");
+  headers.set("Authorization", `Bearer ${token}`);
+  return readResponse<T>(await fetch(`${baseUrl}${path}`, { ...init, cache: "no-store", headers }));
+}
+
+/** Public set routes intentionally send no authentication token. */
+export async function publicGet<T>(path: string): Promise<T> {
+  return readResponse<T>(await fetch(`${baseUrl}${path}`, { cache: "no-store" }));
 }

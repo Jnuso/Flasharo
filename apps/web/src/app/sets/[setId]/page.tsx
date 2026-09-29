@@ -16,6 +16,7 @@ function SetEditor({ user, setId }: { user: User; setId: string }) {
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [error, setError] = useState("");
   const [editingCard, setEditingCard] = useState<string | null>(null);
 
@@ -80,12 +81,26 @@ function SetEditor({ user, setId }: { user: User; setId: string }) {
     catch (caught) { setError(caught instanceof Error ? caught.message : "Could not delete this set."); }
   }
 
+  async function toggleVisibility() {
+    if (!set) return;
+    setSharing(true); setError("");
+    try {
+      const visibility = set.visibility === "private" ? "public" : "private";
+      const updated = await apiFetch<StudySet>(user, `/sets/${setId}/visibility`, {
+        method: "PATCH", body: JSON.stringify({ visibility }),
+      });
+      setSet(updated);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not change sharing for this set.");
+    } finally { setSharing(false); }
+  }
+
   if (loading && !set) return <div className="loading-panel">Loading your set…</div>;
   if (!set) return <main className="container narrow-page"><div className="error-panel"><h1>Set unavailable</h1><p>{error || "This set may have been deleted."}</p><Link className="button button-outline" href="/sets">Back to my sets</Link></div></main>;
 
   return <main className="container workspace-page editor-page">
     <Link className="back-link" href="/sets">← My study sets</Link>
-    <div className="page-heading editor-heading"><div><span className="eyebrow">Private study set</span><h1>{set.title}</h1><p>{set.cards.length} {set.cards.length === 1 ? "card" : "cards"} ready to study</p></div>
+    <div className="page-heading editor-heading"><div><span className="eyebrow">{set.visibility === "public" ? "Public study set" : "Private study set"}</span><h1>{set.title}</h1><p>{set.cards.length} {set.cards.length === 1 ? "card" : "cards"} ready to study</p></div>
       <Link className={`button button-primary ${set.cards.length === 0 ? "button-disabled" : ""}`} aria-disabled={set.cards.length === 0} href={set.cards.length ? `/sets/${setId}/study` : "#cards"}>Study cards →</Link>
     </div>
     {error && <div className="form-error" role="alert">{error} <button className="text-link" onClick={refresh}>Reload</button></div>}
@@ -96,7 +111,15 @@ function SetEditor({ user, setId }: { user: User; setId: string }) {
         <div className="form-actions"><button className="button button-outline button-small" disabled={saving}>{saving ? "Saving…" : "Save details"}</button><button className="text-danger" type="button" onClick={deleteSet}>Delete set</button></div>
       </form>
     </section>
-    <section className="editor-section" id="cards"><div className="section-heading"><div><span className="section-kicker">02 / THE CARDS</span><h2>Your flashcards</h2></div><span className="count-pill">{set.cards.length} cards</span></div>
+    <section className="editor-section"><div className="section-heading"><div><span className="section-kicker">02 / SHARING</span><h2>Who can study this set?</h2></div></div>
+      <div className="sharing-panel"><div><span className={set.visibility === "public" ? "public-badge" : "private-badge"}>{set.visibility === "public" ? "Public" : "Private"}</span>
+        <p>{set.visibility === "public" ? "Anyone can find and study these cards. Only you can edit them." : "Only you can see and study these cards."}</p>
+      </div><div className="sharing-actions">
+        {set.visibility === "public" && <Link className="button button-outline button-small" href={`/explore/${setId}`}>View public page ↗</Link>}
+        <button className="button button-primary button-small" type="button" disabled={sharing} onClick={toggleVisibility}>{sharing ? "Updating…" : set.visibility === "public" ? "Make private" : "Make public"}</button>
+      </div></div>
+    </section>
+    <section className="editor-section" id="cards"><div className="section-heading"><div><span className="section-kicker">03 / THE CARDS</span><h2>Your flashcards</h2></div><span className="count-pill">{set.cards.length} cards</span></div>
       {set.cards.length === 0 && <p className="muted">No cards yet. Add the first one below.</p>}
       <div className="editor-card-list">{set.cards.map((card, index) => <article className="editor-card" key={card.id}>
         <div className="card-index">{String(index + 1).padStart(2, "0")}</div>

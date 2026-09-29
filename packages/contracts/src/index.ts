@@ -15,10 +15,13 @@ export interface Flashcard {
   updatedAt: string;
 }
 
+export type SetVisibility = "private" | "public";
+
 export interface StudySetSummary {
   id: string;
   title: string;
   description: string;
+  visibility: SetVisibility;
   cardCount: number;
   createdAt: string;
   updatedAt: string;
@@ -31,6 +34,13 @@ export interface StudySet extends Omit<StudySetSummary, "cardCount"> {
 export interface StudySetInput {
   title: string;
   description?: string;
+}
+
+export interface PublicSetSearchResult {
+  items: StudySetSummary[];
+  page: number;
+  totalPages: number;
+  total: number;
 }
 
 export interface FlashcardInput {

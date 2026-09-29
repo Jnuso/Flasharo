@@ -63,7 +63,7 @@ function SetsDashboard({ user }: { user: User }) {
     {error && <div className="form-error" role="alert">{error} <button className="text-link" onClick={refresh}>Retry</button></div>}
     {loading ? <div className="loading-panel">Loading your sets…</div> : sets.length === 0 ? <div className="empty-state"><div className="empty-icon">✦</div><h2>Your first set starts here</h2><p>Collect the terms you want to remember, then study them one card at a time.</p><button className="button button-outline" onClick={() => setShowForm(true)}>Create a set</button></div> :
       <div className="set-grid">{sets.map((set) => <Link className="set-tile" key={set.id} href={`/sets/${set.id}`}>
-        <span className="tile-top"><span className="private-badge">Private</span><span aria-hidden="true">↗</span></span>
+        <span className="tile-top"><span className={set.visibility === "public" ? "public-badge" : "private-badge"}>{set.visibility === "public" ? "Public" : "Private"}</span><span aria-hidden="true">↗</span></span>
         <h2>{set.title}</h2><p>{set.description || "A space for your ideas."}</p>
         <span className="tile-bottom">{set.cardCount} {set.cardCount === 1 ? "card" : "cards"}<span>Updated {new Date(set.updatedAt).toLocaleDateString()}</span></span>
       </Link>)}</div>}

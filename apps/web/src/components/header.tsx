@@ -11,6 +11,7 @@ export function Header() {
     <div className="container header-inner">
       <Link className="brand" href="/" aria-label="Flasharo home"><span className="brand-mark">✦</span> Flasharo</Link>
       <nav className="header-actions" aria-label="Main navigation">
+        <Link className="nav-link" href="/explore">Explore</Link>
         {user ? <>
           <Link className="nav-link" href="/sets">My sets</Link>
           <button className="nav-link nav-button" onClick={async () => { await logout(); router.push("/"); }}>Log out</button>

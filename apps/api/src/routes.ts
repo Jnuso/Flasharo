@@ -41,14 +41,15 @@ const cardResponse = {
 } as const;
 const setFields = {
   id: uuid, title: { type: "string" }, description: { type: "string" },
+  visibility: { type: "string", enum: ["private", "public"] },
   createdAt: dateTime, updatedAt: dateTime,
 } as const;
-const setResponse = {
-  type: "object", required: ["id", "title", "description", "createdAt", "updatedAt", "cards"],
+export const setResponse = {
+  type: "object", required: ["id", "title", "description", "visibility", "createdAt", "updatedAt", "cards"],
   properties: { ...setFields, cards: { type: "array", items: cardResponse } },
 } as const;
-const setSummaryResponse = {
-  type: "object", required: ["id", "title", "description", "createdAt", "updatedAt", "cardCount"],
+export const setSummaryResponse = {
+  type: "object", required: ["id", "title", "description", "visibility", "createdAt", "updatedAt", "cardCount"],
   properties: { ...setFields, cardCount: { type: "integer" } },
 } as const;
 
@@ -67,14 +68,27 @@ function serialiseCard(card: typeof cards.$inferSelect) {
   };
 }
 
-function serialiseSet(set: typeof studySets.$inferSelect, setCards: (typeof cards.$inferSelect)[]) {
+export function serialiseSet(set: typeof studySets.$inferSelect, setCards: (typeof cards.$inferSelect)[]) {
   return {
     id: set.id,
     title: set.title,
     description: set.description,
+    visibility: set.visibility,
     createdAt: set.createdAt.toISOString(),
     updatedAt: set.updatedAt.toISOString(),
     cards: setCards.map(serialiseCard),
+  };
+}
+
+export function serialiseSummary(set: typeof studySets.$inferSelect, cardCount: number) {
+  return {
+    id: set.id,
+    title: set.title,
+    description: set.description,
+    visibility: set.visibility,
+    cardCount,
+    createdAt: set.createdAt.toISOString(),
+    updatedAt: set.updatedAt.toISOString(),
   };
 }
 
@@ -84,7 +98,7 @@ async function ownedSet(setId: string, uid: string) {
   return set;
 }
 
-async function loadCards(setId: string) {
+export async function loadCards(setId: string) {
   return db.select().from(cards).where(eq(cards.setId, setId))
     .orderBy(asc(cards.position), asc(cards.createdAt));
 }
@@ -115,14 +129,7 @@ export function registerRoutes(app: FastifyInstance) {
       count: sql<number>`count(*)::integer`,
     }).from(cards).where(inArray(cards.setId, sets.map((set) => set.id))).groupBy(cards.setId);
     const countBySet = new Map(counts.map((row) => [row.setId, row.count]));
-    return sets.map((set) => ({
-      id: set.id,
-      title: set.title,
-      description: set.description,
-      cardCount: countBySet.get(set.id) ?? 0,
-      createdAt: set.createdAt.toISOString(),
-      updatedAt: set.updatedAt.toISOString(),
-    }));
+    return sets.map((set) => serialiseSummary(set, countBySet.get(set.id) ?? 0));
   });
 
   app.post<{ Body: StudySetInput }>("/sets", { schema: { tags: ["sets"], body: setBody, response: { 201: setResponse } } }, async (request, reply) => {
@@ -156,6 +163,23 @@ export function registerRoutes(app: FastifyInstance) {
       description: request.body.description?.trim() ?? "",
       updatedAt: new Date(),
     }).where(and(eq(studySets.id, request.params.setId), eq(studySets.ownerId, request.identity.uid))).returning();
+    if (!set) return reply.code(404).send({ error: "Set not found." });
+    return serialiseSet(set, await loadCards(set.id));
+  });
+
+  app.patch<{ Params: SetParams; Body: { visibility: "private" | "public" } }>("/sets/:setId/visibility", {
+    schema: {
+      tags: ["sets"], params: setParams, response: { 200: setResponse },
+      body: {
+        type: "object", required: ["visibility"], additionalProperties: false,
+        properties: { visibility: { type: "string", enum: ["private", "public"] } },
+      },
+    },
+  }, async (request, reply) => {
+    const [set] = await db.update(studySets)
+      .set({ visibility: request.body.visibility, updatedAt: new Date() })
+      .where(and(eq(studySets.id, request.params.setId), eq(studySets.ownerId, request.identity.uid)))
+      .returning();
     if (!set) return reply.code(404).send({ error: "Set not found." });
     return serialiseSet(set, await loadCards(set.id));
   });

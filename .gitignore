@@ -6,6 +6,8 @@ coverage/
 playwright-report/
 test-results/
 .firebase-data/
+firebase-debug.log
+ui-debug.log
 .env
 .env.local
 .env.*.local

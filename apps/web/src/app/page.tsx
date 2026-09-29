@@ -1,6 +1,15 @@
+"use client";
+
 import Link from "next/link";
+import { useAuth } from "../lib/auth-context";
+import SetsPage from "./sets/page";
 
 export default function HomePage() {
+  const { user, ready } = useAuth();
+
+  if (!ready) return <div className="loading-panel">Loading your account…</div>;
+  if (user) return <SetsPage />;
+
   return <main>
     <section className="hero container">
       <div className="hero-copy">
@@ -9,7 +18,7 @@ export default function HomePage() {
         <p>Turn your notes into your own flashcards. Keep your sets together and study whenever you have a few minutes.</p>
         <div className="hero-actions">
           <Link className="button button-primary" href="/signup">Create your first set <span aria-hidden="true">↗</span></Link>
-          <Link className="button button-outline" href="/login">I already have an account</Link>
+          <Link className="button button-outline" href="/explore">Explore public sets</Link>
         </div>
       </div>
       <div className="hero-art" aria-hidden="true">
@@ -23,7 +32,7 @@ export default function HomePage() {
     <section className="feature-strip"><div className="container feature-grid">
       <div><span className="feature-number">01</span><h2>Build your set</h2><p>Write a term and a definition for each idea you want to remember.</p></div>
       <div><span className="feature-number">02</span><h2>Flip through cards</h2><p>Test your recall one card at a time, at your own pace.</p></div>
-      <div><span className="feature-number">03</span><h2>Keep learning</h2><p>Come back to your private sets whenever you’re ready to study.</p></div>
+      <div><span className="feature-number">03</span><h2>Learn together</h2><p>Share a set when you’re ready, or study cards made by the community.</p></div>
     </div></section>
   </main>;
 }

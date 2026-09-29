@@ -18,6 +18,18 @@ test("account, private set, cards, study, edit, and logout", async ({ page }) =>
   await page.getByRole("button", { name: "Add card" }).click();
   await expect(page.getByText("Third planet from the Sun")).toBeVisible();
 
+  await page.getByPlaceholder("What do you want to remember?").fill("Mars");
+  await page.getByPlaceholder("Write the answer in your own words").fill("Fourth planet from the Sun");
+  await page.getByRole("button", { name: "Add card" }).click();
+  await expect(page.getByText("Fourth planet from the Sun")).toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Delete", exact: true }).click();
+  await expect(page.getByText("Fourth planet from the Sun")).toHaveCount(0);
+
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: "My study sets" })).toBeVisible();
+  await page.getByRole("link", { name: /Planet facts/ }).click();
+
   await page.getByRole("link", { name: "Study cards" }).click();
   await expect(page.getByRole("button", { name: "Show definition" })).toContainText("Earth");
   await page.getByRole("button", { name: "Show definition" }).click();
@@ -29,11 +41,25 @@ test("account, private set, cards, study, edit, and logout", async ({ page }) =>
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Our home planet")).toBeVisible();
 
+  await page.getByRole("button", { name: "Make public" }).click();
+  await expect(page.getByRole("link", { name: /View public page/ })).toBeVisible();
+
   await page.getByRole("button", { name: "Log out" }).click();
   await expect(page.getByRole("link", { name: "Get started" })).toBeVisible();
+  await page.getByRole("link", { name: "Explore" }).click();
+  await page.getByLabel("Search public sets").fill("Planet facts");
+  await page.getByRole("button", { name: "Search" }).click();
+  await page.getByRole("link", { name: /Planet facts/ }).click();
+  await expect(page.getByRole("button", { name: "Show definition" })).toContainText("Earth");
+  await page.getByRole("button", { name: "Show definition" }).click();
+  await expect(page.getByRole("button", { name: "Show term" })).toContainText("Our home planet");
+
   await page.goto("/login");
   await page.getByLabel("Email address").fill(email);
   await page.getByLabel("Password").fill("learning123");
   await page.getByRole("button", { name: "Log in" }).click();
   await expect(page.getByText("Planet facts")).toBeVisible();
+  await page.getByRole("link", { name: /Planet facts/ }).click();
+  await page.getByRole("button", { name: "Make private" }).click();
+  await expect(page.getByText("Only you can see and study these cards.")).toBeVisible();
 });
