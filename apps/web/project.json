@@ -1,0 +1,10 @@
+{
+  "name": "web",
+  "root": "apps/web",
+  "targets": {
+    "dev": { "executor": "nx:run-commands", "options": { "command": "pnpm --filter @flasharo/web dev" }, "continuous": true },
+    "build": { "executor": "nx:run-commands", "options": { "command": "pnpm --filter @flasharo/web build" }, "outputs": ["{projectRoot}/.next"] },
+    "typecheck": { "executor": "nx:run-commands", "options": { "command": "pnpm --filter @flasharo/web typecheck" } },
+    "test": { "executor": "nx:run-commands", "options": { "command": "pnpm --filter @flasharo/web test" } }
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/
+.nx/
+.next/
+dist/
+coverage/
+playwright-report/
+test-results/
+.firebase-data/
+.env
+.env.local
+.env.*.local
+!.env.example
+*.tsbuildinfo

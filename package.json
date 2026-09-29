@@ -1,0 +1,21 @@
+{
+  "name": "flasharo",
+  "private": true,
+  "packageManager": "pnpm@10.33.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "nx run contracts:build && nx run-many -t dev -p web api auth-emulator --parallel=3",
+    "build": "nx run-many -t build -p contracts api web",
+    "typecheck": "nx run-many -t typecheck -p contracts api web",
+    "test": "nx run-many -t test -p api web",
+    "db:migrate": "pnpm --filter @flasharo/api db:migrate",
+    "db:up": "docker compose up -d db",
+    "db:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "firebase-tools": "^14.0.0",
+    "nx": "^23.2.1",
+    "typescript": "^6.0.2"
+  }
+}

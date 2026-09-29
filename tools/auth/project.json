@@ -1,0 +1,13 @@
+{
+  "name": "auth-emulator",
+  "root": "tools/auth",
+  "targets": {
+    "dev": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node tools/auth/start.mjs",
+        "cwd": "."
+      }
+    }
+  }
+}
