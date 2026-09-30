@@ -6,7 +6,7 @@ const require = createRequire(import.meta.url);
 const firebaseCli = require.resolve("firebase-tools/lib/bin/firebase.js");
 
 const savedData = ".firebase-data";
-const args = ["emulators:start", "--only", "auth", "--project", "demo-flasharo"];
+const args = ["emulators:start", "--only", "auth,firestore", "--project", "demo-flasharo"];
 if (existsSync(`${savedData}/firebase-export-metadata.json`)) {
   args.push(`--import=${savedData}`);
 }

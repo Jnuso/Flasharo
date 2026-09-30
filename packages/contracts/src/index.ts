@@ -51,3 +51,39 @@ export interface FlashcardInput {
 export interface ApiError {
   error: string;
 }
+
+export type LearnStage = "multiple-choice" | "written" | "mastered";
+
+export interface LearnOption {
+  cardId: string;
+  definition: string;
+}
+
+export interface LearnQuestion {
+  cardId: string;
+  term: string;
+  stage: Exclude<LearnStage, "mastered">;
+  options: LearnOption[];
+  attempts: number;
+}
+
+export interface LearnSession {
+  setId: string;
+  title: string;
+  isOwner: boolean;
+  status: "needs-cards" | "question" | "complete";
+  totalCards: number;
+  masteredCards: number;
+  question: LearnQuestion | null;
+}
+
+export interface LearnAnswerResult {
+  correct: boolean;
+  correctAnswer: string;
+  stage: LearnStage;
+}
+
+export interface LearnAnswerInput {
+  cardId: string;
+  answer: string;
+}

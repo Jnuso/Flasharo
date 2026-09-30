@@ -101,7 +101,7 @@ function SetEditor({ user, setId }: { user: User; setId: string }) {
   return <main className="container workspace-page editor-page">
     <Link className="back-link" href="/sets">← My study sets</Link>
     <div className="page-heading editor-heading"><div><span className="eyebrow">{set.visibility === "public" ? "Public study set" : "Private study set"}</span><h1>{set.title}</h1><p>{set.cards.length} {set.cards.length === 1 ? "card" : "cards"} ready to study</p></div>
-      <Link className={`button button-primary ${set.cards.length === 0 ? "button-disabled" : ""}`} aria-disabled={set.cards.length === 0} href={set.cards.length ? `/sets/${setId}/study` : "#cards"}>Study cards →</Link>
+      <div className="editor-actions"><Link className="button button-outline" href={`/sets/${setId}/learn`}>Learn mode</Link><Link className={`button button-primary ${set.cards.length === 0 ? "button-disabled" : ""}`} aria-disabled={set.cards.length === 0} href={set.cards.length ? `/sets/${setId}/study` : "#cards"}>Study cards →</Link></div>
     </div>
     {error && <div className="form-error" role="alert">{error} <button className="text-link" onClick={refresh}>Reload</button></div>}
     <section className="editor-section"><div className="section-heading"><div><span className="section-kicker">01 / THE DETAILS</span><h2>About this set</h2></div></div>

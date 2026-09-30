@@ -8,6 +8,9 @@ test-results/
 .firebase-data/
 firebase-debug.log
 ui-debug.log
+firestore-debug.log
+Test_Automation/artifacts/
+__pycache__/
 .env
 .env.local
 .env.*.local

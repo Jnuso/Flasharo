@@ -6,9 +6,11 @@ import { useParams } from "next/navigation";
 import type { StudySet } from "@flasharo/contracts";
 import { StudyDeck } from "../../../components/study-deck";
 import { publicGet } from "../../../lib/api";
+import { useAuth } from "../../../lib/auth-context";
 
 export default function PublicSetPage() {
   const { setId } = useParams<{ setId: string }>();
+  const { user } = useAuth();
   const [set, setSet] = useState<StudySet | null>(null);
   const [error, setError] = useState("");
 
@@ -22,5 +24,5 @@ export default function PublicSetPage() {
 
   if (error) return <main className="container narrow-page"><div className="error-panel"><h1>Set unavailable</h1><p>This set may be private now or may have been deleted.</p><Link className="button button-outline" href="/explore">Explore other sets</Link></div></main>;
   if (!set) return <div className="loading-panel">Getting these cards ready…</div>;
-  return <StudyDeck key={set.id} set={set} backHref="/explore" backLabel="Explore sets" />;
+  return <StudyDeck key={set.id} set={set} backHref="/explore" backLabel="Explore sets" learnHref={user ? `/sets/${setId}/learn` : undefined} />;
 }

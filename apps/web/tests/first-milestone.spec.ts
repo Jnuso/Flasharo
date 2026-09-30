@@ -26,6 +26,10 @@ test("account, private set, cards, study, edit, and logout", async ({ page }) =>
   await page.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(page.getByText("Fourth planet from the Sun")).toHaveCount(0);
 
+  await page.getByPlaceholder("What do you want to remember?").fill("Jupiter");
+  await page.getByPlaceholder("Write the answer in your own words").fill("Fifth planet from the Sun");
+  await page.getByRole("button", { name: "Add card" }).click();
+
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "My study sets" })).toBeVisible();
   await page.getByRole("link", { name: /Planet facts/ }).click();
@@ -40,6 +44,19 @@ test("account, private set, cards, study, edit, and logout", async ({ page }) =>
   await page.getByLabel("Definition").fill("Our home planet");
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(page.getByText("Our home planet")).toBeVisible();
+
+  await page.getByRole("link", { name: "Learn mode" }).click();
+  await page.getByRole("button", { name: "Our home planet" }).click();
+  await expect(page.getByText("Correct — now type it.")).toBeVisible();
+  await page.getByRole("button", { name: "Type the answer" }).click();
+  await page.reload();
+  await expect(page.getByText("Step 2 / Write")).toBeVisible();
+  await page.getByLabel("Your answer").fill("our home planet");
+  await page.getByRole("button", { name: "Check answer" }).click();
+  await expect(page.getByText("Correct — card learned!")).toBeVisible();
+  await page.getByRole("button", { name: "Next card" }).click();
+  await expect(page.getByRole("heading", { name: "Jupiter" })).toBeVisible();
+  await page.getByRole("link", { name: "Back to set" }).click();
 
   await page.getByRole("button", { name: "Make public" }).click();
   await expect(page.getByRole("link", { name: /View public page/ })).toBeVisible();

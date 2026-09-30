@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { StudySet } from "@flasharo/contracts";
 
-export function StudyDeck({ set, backHref, backLabel }: {
+export function StudyDeck({ set, backHref, backLabel, learnHref }: {
   set: StudySet;
   backHref: string;
   backLabel: string;
+  learnHref?: string;
 }) {
   const [index, setIndex] = useState(0);
   const [flipped, setFlipped] = useState(false);
@@ -42,7 +43,7 @@ export function StudyDeck({ set, backHref, backLabel }: {
   const card = set.cards[index]!;
   return <main className="container study-page">
     <Link className="back-link" href={backHref}>← Back to {backLabel}</Link>
-    <div className="study-heading"><span className="eyebrow">Study mode · {set.visibility === "public" ? "Public set" : "Your set"}</span><h1>{set.title}</h1><p>{set.description || "Think of the answer, then flip the card to check yourself."}</p></div>
+    <div className="study-heading"><span className="eyebrow">Study mode · {set.visibility === "public" ? "Public set" : "Your set"}</span><h1>{set.title}</h1><p>{set.description || "Think of the answer, then flip the card to check yourself."}</p>{learnHref && <Link className="text-link" href={learnHref}>Practice in Learn mode →</Link>}</div>
     <div className="study-progress"><span>Card {index + 1} of {set.cards.length}</span><div className="progress-track"><div style={{ width: `${((index + 1) / set.cards.length) * 100}%` }} /></div></div>
     <button className={`study-card ${flipped ? "is-flipped" : ""}`} onClick={() => setFlipped((value) => !value)} aria-label={flipped ? "Show term" : "Show definition"}>
       <span className="study-card-label">{flipped ? "DEFINITION" : "TERM"}</span>

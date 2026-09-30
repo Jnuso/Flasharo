@@ -8,6 +8,7 @@
     "build": "nx run-many -t build -p contracts api web",
     "typecheck": "nx run-many -t typecheck -p contracts api web",
     "test": "nx run-many -t test -p api web",
+    "test:selenium": "py -m unittest discover -s Test_Automation -p test_*.py -v",
     "db:migrate": "pnpm --filter @flasharo/api db:migrate",
     "db:up": "docker compose up -d db",
     "db:down": "docker compose down"

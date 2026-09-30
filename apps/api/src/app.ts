@@ -5,6 +5,8 @@ import Fastify from "fastify";
 import { verifyFirebaseToken, type Identity, type VerifyToken } from "./auth.js";
 import { registerRoutes } from "./routes.js";
 import { registerPublicRoutes } from "./public-routes.js";
+import { FirestoreLearnProgressStore, type LearnProgressStore } from "./learn-progress.js";
+import { registerLearnRoutes } from "./learn-routes.js";
 import { syncProfile } from "./profile.js";
 
 declare module "fastify" {
@@ -13,9 +15,10 @@ declare module "fastify" {
   }
 }
 
-export async function createApp(options: { verifyToken?: VerifyToken } = {}) {
-  const app = Fastify({ logger: true });
+export async function createApp(options: { verifyToken?: VerifyToken; learnProgressStore?: LearnProgressStore; logger?: boolean } = {}) {
+  const app = Fastify({ logger: options.logger ?? true });
   const verifyToken = options.verifyToken ?? verifyFirebaseToken;
+  const learnProgressStore = options.learnProgressStore ?? new FirestoreLearnProgressStore();
 
   await app.register(cors, {
     origin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
@@ -50,6 +53,7 @@ export async function createApp(options: { verifyToken?: VerifyToken } = {}) {
       await syncProfile(request.identity);
     });
     registerRoutes(privateApp);
+    registerLearnRoutes(privateApp, learnProgressStore);
   }, { prefix: "/v1" });
 
   app.setErrorHandler((error, request, reply) => {

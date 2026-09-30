@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { FastifyInstance } from "fastify";
+import { gradeAnswer, type LearnProgressStore, type SavedCardProgress } from "./learn-progress.js";
 
 const testUrl = process.env.TEST_DATABASE_URL;
 const run = testUrl ? describe : describe.skip;
@@ -7,6 +8,26 @@ const run = testUrl ? describe : describe.skip;
 run("Flasharo API with a test PostgreSQL database", () => {
   let app: FastifyInstance;
   let pool: (typeof import("./db/client.js"))["pool"];
+  const savedProgress = new Map<string, SavedCardProgress>();
+  const progressStore: LearnProgressStore = {
+    async getSet(uid, setId) {
+      const prefix = `${uid}/${setId}/`;
+      return new Map([...savedProgress.entries()]
+        .filter(([key]) => key.startsWith(prefix))
+        .map(([key, progress]) => [key.slice(prefix.length), progress]));
+    },
+    async recordAnswer(uid, setId, card, answer) {
+      const key = `${uid}/${setId}/${card.id}`;
+      const graded = gradeAnswer(savedProgress.get(key), card, answer);
+      if (!graded) return null;
+      savedProgress.set(key, graded.progress);
+      return graded.result;
+    },
+    async restartSet(uid, setId) {
+      const prefix = `${uid}/${setId}/`;
+      for (const key of savedProgress.keys()) if (key.startsWith(prefix)) savedProgress.delete(key);
+    },
+  };
 
   beforeAll(async () => {
     const databaseName = new URL(testUrl!).pathname.slice(1);
@@ -20,6 +41,8 @@ run("Flasharo API with a test PostgreSQL database", () => {
     await migrate(database.db, { migrationsFolder: "./drizzle" });
     const { createApp } = await import("./app.js");
     app = await createApp({
+      logger: false,
+      learnProgressStore: progressStore,
       verifyToken: async (token) => {
         if (token === "alice") return { uid: "alice", email: "alice@example.com" };
         if (token === "bob") return { uid: "bob", email: "bob@example.com" };
@@ -30,6 +53,7 @@ run("Flasharo API with a test PostgreSQL database", () => {
   });
 
   beforeEach(async () => {
+    savedProgress.clear();
     await pool.query("DELETE FROM users WHERE id IN ('alice', 'bob')");
   });
 
@@ -38,7 +62,7 @@ run("Flasharo API with a test PostgreSQL database", () => {
     await pool?.end();
   });
 
-  function request(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", url: string, token?: string, payload?: unknown) {
+  function request(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", url: string, token?: string, payload?: Record<string, unknown>) {
     return app.inject({ method, url, headers: token ? { authorization: `Bearer ${token}` } : {}, payload });
   }
 
@@ -136,6 +160,84 @@ run("Flasharo API with a test PostgreSQL database", () => {
     expect((await request("PATCH", `/v1/sets/${setId}/visibility`, "alice", { visibility: "private" })).statusCode).toBe(200);
     expect((await request("GET", `/v1/public/sets/${setId}`)).statusCode).toBe(404);
     expect((await request("GET", "/v1/public/sets?q=ocean")).json().total).toBe(0);
+  });
+
+  it("saves the multiple-choice then written steps for each user", async () => {
+    const set = await request("POST", "/v1/sets", "alice", { title: "Planets" });
+    const setId = set.json().id as string;
+    const earth = await request("POST", `/v1/sets/${setId}/cards`, "alice", { term: "Earth", definition: "Third planet" });
+    const mars = await request("POST", `/v1/sets/${setId}/cards`, "alice", { term: "Mars", definition: "Fourth planet" });
+    const earthId = earth.json().id as string;
+    const marsId = mars.json().id as string;
+
+    expect((await request("GET", `/v1/learn/sets/${setId}`)).statusCode).toBe(401);
+    expect((await request("GET", `/v1/learn/sets/${setId}`, "bob")).statusCode).toBe(404);
+    const start = (await request("GET", `/v1/learn/sets/${setId}`, "alice")).json();
+    expect(start.question.stage).toBe("multiple-choice");
+    expect(start.question.options).toHaveLength(2);
+    expect(start.question.options.map((option: { cardId: string }) => option.cardId)).toContain(earthId);
+
+    const wrongChoice = await request("POST", `/v1/learn/sets/${setId}/answers`, "alice", { cardId: earthId, answer: marsId });
+    expect(wrongChoice.json()).toMatchObject({ correct: false, stage: "multiple-choice" });
+    expect((await request("GET", `/v1/learn/sets/${setId}`, "alice")).json().question.attempts).toBe(1);
+    const rightChoice = await request("POST", `/v1/learn/sets/${setId}/answers`, "alice", { cardId: earthId, answer: earthId });
+    expect(rightChoice.json()).toMatchObject({ correct: true, stage: "written" });
+    const written = (await request("GET", `/v1/learn/sets/${setId}`, "alice")).json();
+    expect(written.question.stage).toBe("written");
+    expect(written.question.options).toEqual([]);
+
+    expect((await request("POST", `/v1/learn/sets/${setId}/answers`, "alice", { cardId: earthId, answer: "Second planet" })).json())
+      .toMatchObject({ correct: false, stage: "written" });
+    expect((await request("POST", `/v1/learn/sets/${setId}/answers`, "alice", { cardId: earthId, answer: "  THIRD   PLANET  " })).json())
+      .toMatchObject({ correct: true, stage: "mastered" });
+    const next = (await request("GET", `/v1/learn/sets/${setId}`, "alice")).json();
+    expect(next.masteredCards).toBe(1);
+    expect(next.question.cardId).toBe(marsId);
+    expect((await request("POST", `/v1/learn/sets/${setId}/answers`, "alice", { cardId: earthId, answer: earthId })).statusCode).toBe(409);
+
+    await request("PATCH", `/v1/sets/${setId}/visibility`, "alice", { visibility: "public" });
+    const bob = (await request("GET", `/v1/learn/sets/${setId}`, "bob")).json();
+    expect(bob.masteredCards).toBe(0);
+    expect(bob.question.stage).toBe("multiple-choice");
+  });
+
+  it("lets a learner restart only their own Learn progress on an accessible set", async () => {
+    const created = await request("POST", "/v1/sets", "alice", { title: "Planets" });
+    const setId = created.json().id as string;
+    const earth = await request("POST", `/v1/sets/${setId}/cards`, "alice", { term: "Earth", definition: "Third planet" });
+    await request("POST", `/v1/sets/${setId}/cards`, "alice", { term: "Mars", definition: "Fourth planet" });
+    const earthId = earth.json().id as string;
+
+    expect((await request("POST", `/v1/learn/sets/${setId}/restart`)).statusCode).toBe(401);
+    expect((await request("POST", `/v1/learn/sets/${setId}/restart`, "bob")).statusCode).toBe(404);
+
+    await request("POST", `/v1/learn/sets/${setId}/answers`, "alice", { cardId: earthId, answer: earthId });
+    expect((await request("GET", `/v1/learn/sets/${setId}`, "alice")).json().question.stage).toBe("written");
+    expect((await request("POST", `/v1/learn/sets/${setId}/restart`, "alice")).statusCode).toBe(204);
+    const restarted = (await request("GET", `/v1/learn/sets/${setId}`, "alice")).json();
+    expect(restarted.question).toMatchObject({ cardId: earthId, stage: "multiple-choice", attempts: 0 });
+    expect((await request("GET", `/v1/sets/${setId}`, "alice")).json().cards).toHaveLength(2);
+
+    await request("PATCH", `/v1/sets/${setId}/visibility`, "alice", { visibility: "public" });
+    await request("POST", `/v1/learn/sets/${setId}/answers`, "bob", { cardId: earthId, answer: earthId });
+    expect((await request("GET", `/v1/learn/sets/${setId}`, "bob")).json().question.stage).toBe("written");
+    await request("POST", `/v1/learn/sets/${setId}/restart`, "alice");
+    expect((await request("GET", `/v1/learn/sets/${setId}`, "bob")).json().question.stage).toBe("written");
+    expect((await request("POST", `/v1/learn/sets/${setId}/restart`, "bob")).statusCode).toBe(204);
+    expect((await request("GET", `/v1/learn/sets/${setId}`, "bob")).json().question.stage).toBe("multiple-choice");
+  });
+
+  it("requires distinct answers for multiple choice and restarts an edited card", async () => {
+    const set = await request("POST", "/v1/sets", "alice", { title: "Words" });
+    const setId = set.json().id as string;
+    const first = await request("POST", `/v1/sets/${setId}/cards`, "alice", { term: "A", definition: "One" });
+    const cardId = first.json().id as string;
+    expect((await request("GET", `/v1/learn/sets/${setId}`, "alice")).json().status).toBe("needs-cards");
+    await request("POST", `/v1/sets/${setId}/cards`, "alice", { term: "B", definition: "Two" });
+    await request("POST", `/v1/learn/sets/${setId}/answers`, "alice", { cardId, answer: cardId });
+    expect((await request("GET", `/v1/learn/sets/${setId}`, "alice")).json().question.stage).toBe("written");
+    await request("PATCH", `/v1/sets/${setId}/cards/${cardId}`, "alice", { term: "A", definition: "Changed answer" });
+    expect((await request("GET", `/v1/learn/sets/${setId}`, "alice")).json().question.stage).toBe("multiple-choice");
   });
 
   it("rejects blank card content and incomplete reorder lists", async () => {

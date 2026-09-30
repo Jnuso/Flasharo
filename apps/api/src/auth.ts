@@ -1,5 +1,5 @@
-import { getApps, initializeApp } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getFirebaseAdminApp } from "./firebase-admin.js";
 
 export interface Identity {
   uid: string;
@@ -9,10 +9,7 @@ export interface Identity {
 export type VerifyToken = (token: string) => Promise<Identity>;
 
 export const verifyFirebaseToken: VerifyToken = async (token) => {
-  if (getApps().length === 0) {
-    initializeApp({ projectId: process.env.FIREBASE_PROJECT_ID ?? "demo-flasharo" });
-  }
-  const decoded = await getAuth().verifyIdToken(token);
+  const decoded = await getAuth(getFirebaseAdminApp()).verifyIdToken(token);
   if (!decoded.email) {
     throw new Error("An email address is required for a Flasharo account.");
   }
